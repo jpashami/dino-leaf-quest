@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pip's Leaf Quest</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #5fae4a;
+    font-family: "Comic Sans MS", "Chalkboard SE", "Trebuchet MS", sans-serif; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  #hud { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; gap: 10px; align-items: center;
+    pointer-events: none; flex-wrap: wrap; }
+  .pill { background: rgba(255,255,255,.88); border-radius: 999px; padding: 6px 14px; font-size: 20px; font-weight: bold;
+    color: #2d5a1e; box-shadow: 0 3px 0 rgba(0,0,0,.15); }
+  #bar { width: 160px; height: 14px; background: #d8ecc8; border-radius: 7px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+  #barFill { height: 100%; width: 0; background: linear-gradient(90deg,#7ed957,#f2c94c); transition: width .3s; }
+  .btnpill { pointer-events: auto; cursor: pointer; }
+  #mute { margin-left: auto; }
+  .btn.orange { background: #ff9f43; box-shadow: 0 5px 0 #c4741f; }
+  .btn.grey { background: #8d99a6; box-shadow: 0 5px 0 #5f6a75; }
+  #menu .btn { min-width: 260px; }
+  #roarBtn { position: fixed; right: 20px; bottom: 20px; width: 110px; height: 110px; border-radius: 50%; border: none;
+    background: #ff7b54; color: #fff; font: bold 24px inherit; font-family: inherit; box-shadow: 0 6px 0 #c4502f;
+    display: none; cursor: pointer; }
+  #roarBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c4502f; }
+  #roarBtn.cool { opacity: .45; }
+  #banner { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); background: #fff8d6; border: 5px solid #f2a93b;
+    border-radius: 24px; padding: 16px 28px; text-align: center; color: #6b3d00; display: none; max-width: 90vw;
+    box-shadow: 0 8px 0 rgba(0,0,0,.15); pointer-events: none; }
+  #banner h2 { margin: 0 0 6px; font-size: 32px; }
+  #banner p { margin: 0; font-size: 20px; }
+  .screen { position: fixed; inset: 0; background: rgba(40,80,30,.82); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { background: #fffdf2; border-radius: 28px; padding: 26px 30px; max-width: 560px; width: 100%; text-align: center;
+    color: #3b2a12; box-shadow: 0 10px 0 rgba(0,0,0,.2); }
+  .card h1 { margin: 0 0 8px; color: #3f8f2a; font-size: 34px; }
+  .card p { font-size: 20px; line-height: 1.45; margin: 10px 0; }
+  .card .big { font-size: 64px; margin: 0; line-height: 1.1; }
+  .btn { border: none; background: #5cc96b; color: #fff; font-family: inherit; font-size: 24px; font-weight: bold;
+    padding: 12px 34px; border-radius: 999px; box-shadow: 0 5px 0 #3a8f47; cursor: pointer; margin-top: 10px; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #3a8f47; }
+  .hint { font-size: 16px !important; color: #6d6150; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div class="pill">🍃 <span id="count">0</span></div>
+  <div class="pill"><span id="lvlName">Tiny Hatchling</span><span id="bar"><span id="barFill"></span></span></div>
+  <div class="pill btnpill" id="mute">🔊</div>
+  <div class="pill btnpill" id="pauseBtn">⏸ Menu</div>
+</div>
+
+<div id="menu" class="screen hidden">
+  <div class="card">
+    <p class="big">⏸️</p>
+    <h1>Paused</h1>
+    <button class="btn" id="mResume">▶ Keep Playing</button><br>
+    <button class="btn orange" id="mRestart">🔄 Restart</button><br>
+    <button class="btn grey" id="mExit">🏠 Exit to Start</button>
+    <p class="hint">Tip: press ESC or P to pause any time.</p>
+  </div>
+</div>
+<button id="roarBtn">ROAR!</button>
+<div id="banner"><h2 id="bTitle"></h2><p id="bText"></p></div>
+
+<div id="story" class="screen">
+  <div class="card">
+    <p class="big" id="sEmoji">🌳</p>
+    <h1 id="sTitle"></h1>
+    <p id="sText"></p>
+    <button class="btn" id="sNext">Next ➜</button>
+    <p class="hint" id="sHint"></p>
+  </div>
+</div>
+
+<script>
+// ---------- Story ----------
+const STORY = [
+  { e: "🌳", t: "Greenhollow Valley", x: "In a sunny valley stands the Great Leaf Tree. Its magic leaves keep everything green and full of flowers." },
+  { e: "🌬️", t: "Whoooosh!", x: "One stormy night the grumpy Night Wind blew all the magic leaves away — under bushes, behind rocks, everywhere!" },
+  { e: "🥚", t: "Crack… POP!", x: "At the roots of the tree, a tiny egg hatched. Out wobbled Pip, a tiny long-neck dinosaur who LOVES leaves!" },
+  { e: "🦕", t: "Eat & Grow!", x: "“Little Pip,” whispered the tree, “every leaf you eat makes you stronger. Find my leaves and bring the magic back!”" },
+  { e: "🎮", t: "How to Play", x: "Move with the ARROW keys, or tap / hold the screen where you want to go.<br>✨ Twinkling bushes hide leaves. Golden leaves are worth 3!", hint: "Press SPACE (or the ROAR button) once Pip learns to roar." },
+];
+const LEVELS = [
+  { at: 0,  name: "Tiny Hatchling", title: "", text: "" },
+  { at: 5,  name: "Sniffy Pip",   title: "Sniff sniff!", text: "Pip's nose glows! Follow the yellow arrow to find leaves." },
+  { at: 12, name: "Speedy Pip",   title: "Zoom zoom!",  text: "Pip can run super fast now!" },
+  { at: 20, name: "Strong Pip",   title: "SO strong!",  text: "Bump into rocks with a green crack to SMASH them!" },
+  { at: 30, name: "Roaring Pip",  title: "ROOOAR!",     text: "Press SPACE or the ROAR button to shake leaves out of bushes!" },
+  { at: 42, name: "Leaf Guardian", title: "👑 Leaf Guardian!", text: "Pip is the mightiest dino in Greenhollow!" },
+];
+const COLORS = [ // [base, shadow, highlight] — natural skin tones that get bolder as Pip grows
+  ["#9bb067", "#5e6f35", "#d3dfa6"], ["#7fa05a", "#4a6532", "#c3d89c"], ["#6a9a6e", "#3b5f43", "#b5d6b2"],
+  ["#5f8a8c", "#35585b", "#acd0cf"], ["#7d6f9e", "#4a3f66", "#c7bde0"], ["#c39a45", "#7d5a18", "#f2dc9a"],
+];
+
+// ---------- Setup ----------
+const W = 2600, H = 1800;
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+let vw, vh, zoom, dpr;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  cvs.width = vw * dpr; cvs.height = vh * dpr;
+  zoom = Math.max(0.6, Math.min(1.15, Math.min(vw, vh) / 620));
+}
+addEventListener("resize", resize); resize();
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const dist = (a, b, c, d) => Math.hypot(a - c, b - d);
+const $ = id => document.getElementById(id);
+
+// ---------- Sound (tiny WebAudio synth) ----------
+let ac = null, muted = false;
+function tone(f, d = 0.12, type = "sine", v = 0.15, f2 = null, delay = 0) {
+  if (muted) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02);
+  } catch (e) {}
+}
+const sfx = {
+  chomp: () => { tone(320, 0.07, "square", 0.08, 180); tone(260, 0.07, "square", 0.07, 140, 0.08); },
+  gold: () => [660, 880, 1320].forEach((f, i) => tone(f, 0.15, "triangle", 0.12, null, i * 0.07)),
+  pop: () => tone(500, 0.12, "sine", 0.12, 900),
+  smash: () => { tone(120, 0.25, "sawtooth", 0.15, 40); tone(90, 0.3, "square", 0.08, 30); },
+  roar: () => { tone(140, 0.7, "sawtooth", 0.18, 60); tone(210, 0.6, "square", 0.08, 80); },
+  level: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, "triangle", 0.14, null, i * 0.11)),
+  bonk: () => tone(150, 0.08, "sine", 0.08, 110),
+};
+$("mute").onclick = () => { muted = !muted; $("mute").textContent = muted ? "🔇" : "🔊"; };
+
+// ---------- World ----------
+const TREE = { x: W / 2, y: H / 2 + 60 };          // Great Leaf Tree
+let trees = [], bushes = [], rocks = [], leaves = [], flowers = [], parts = [], texts = [], rings = [], butterflies = [];
+function freeSpot(r, tries = 200) {
+  for (let i = 0; i < tries; i++) {
+    const x = rnd(80, W - 80), y = rnd(80, H - 80);
+    if (dist(x, y, TREE.x, TREE.y) < 190 + r) continue;
+    if (dist(x, y, W / 2, H / 2 + 230) < 90) continue; // start spot
+    if ([...trees, ...bushes, ...rocks].some(o => dist(x, y, o.x, o.y) < o.r + r + 30)) continue;
+    if (leaves.some(l => dist(x, y, l.x, l.y) < r + 30)) continue;
+    return { x, y };
+  }
+  return { x: rnd(80, W - 80), y: rnd(80, H - 80) };
+}
+function addLeaf(x, y, gold = false, pop = false) {
+  leaves.push({ x, y, gold, ph: Math.random() * 6, pop: pop ? 1 : 0 });
+}
+function buildWorld() {
+  trees = []; bushes = []; rocks = []; leaves = []; flowers = [];
+  for (let i = 0; i < 34; i++) { const p = freeSpot(40); trees.push({ ...p, r: 24, s: rnd(0.85, 1.2) }); }
+  for (let i = 0; i < 32; i++) { const p = freeSpot(30); bushes.push({ ...p, r: 30, leaf: i < 16, gold: i < 3, shake: 0 }); }
+  for (let i = 0; i < 14; i++) { const p = freeSpot(30); rocks.push({ ...p, r: 30, leaf: i < 9, gold: i < 2, broken: false }); }
+  for (let i = 0; i < 30; i++) { const p = freeSpot(14); addLeaf(p.x, p.y, i < 2); }
+  for (let i = 0; i < 160; i++) flowers.push({ x: rnd(20, W - 20), y: rnd(20, H - 20), c: ["#ff8fb1", "#ffd84d", "#fff", "#b48cff"][i % 4] });
+  butterflies = Array.from({ length: 8 }, () => ({ x: rnd(0, W), y: rnd(0, H), a: rnd(0, 6), c: ["#ffb3d1", "#ffe17a", "#a8d8ff"][Math.floor(rnd(0, 3))] }));
+}
+
+// Pre-render the grass so each frame is cheap
+const ground = document.createElement("canvas");
+function paintGround() {
+  ground.width = W; ground.height = H;
+  const g = ground.getContext("2d");
+  g.fillStyle = "#8fd16a"; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = Math.random() < 0.5 ? "rgba(70,150,50,.18)" : "rgba(200,240,140,.22)";
+    g.beginPath(); g.ellipse(rnd(0, W), rnd(0, H), rnd(60, 200), rnd(40, 120), rnd(0, 3), 0, 7); g.fill();
+  }
+  g.strokeStyle = "rgba(60,130,40,.45)"; g.lineWidth = 2;
+  for (let i = 0; i < 1400; i++) {
+    const x = rnd(0, W), y = rnd(0, H);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y - 7); g.moveTo(x, y); g.lineTo(x + 3, y - 8); g.stroke();
+  }
+  // soft hedge border
+  g.strokeStyle = "#3f8a2e"; g.lineWidth = 50; g.strokeRect(0, 0, W, H);
+}
+
+// ---------- Player ----------
+const pip = { x: W / 2, y: H / 2 + 230, face: 1, eaten: 0, level: 0, chomp: 0, moving: false, roarCD: 0, t: 0 };
+const scaleOf = () => 0.75 + pip.level * 0.17;
+const radiusOf = () => 16 * scaleOf();
+const speedOf = () => 170 + pip.level * 18 + (pip.level >= 2 ? 70 : 0);
+
+// ---------- Input ----------
+const keys = {};
+addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === " ") { e.preventDefault(); roar(); }
+  if (e.key === "Escape" || e.key.toLowerCase() === "p") state === "pause" ? resume() : pause();
+  if (e.key.startsWith("Arrow")) e.preventDefault();
+});
+addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+let pointer = null;
+cvs.addEventListener("pointerdown", e => { pointer = { x: e.clientX, y: e.clientY }; cvs.setPointerCapture(e.pointerId); });
+cvs.addEventListener("pointermove", e => { if (pointer) pointer = { x: e.clientX, y: e.clientY }; });
+const stopPointer = () => pointer = null;
+cvs.addEventListener("pointerup", stopPointer); cvs.addEventListener("pointercancel", stopPointer);
+$("roarBtn").addEventListener("pointerdown", e => { e.preventDefault(); roar(); });
+
+// ---------- Effects ----------
+function burst(x, y, color, n = 12, sp = 160) {
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, 6.28), s = rnd(sp * 0.3, sp);
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, c: color, sz: rnd(3, 7) });
+  }
+}
+function floatText(x, y, s, c = "#fff") { texts.push({ x, y, s, c, life: 1.2 }); }
+let bannerTimer = 0;
+function banner(t, x) { $("bTitle").textContent = t; $("bText").textContent = x; $("banner").style.display = "block"; bannerTimer = 3.5; }
+
+// ---------- Game actions ----------
+function popBush(b) {
+  if (!b.leaf) return;
+  b.leaf = false; b.shake = 0.6;
+  addLeaf(b.x + rnd(-40, 40), b.y + 45, b.gold, true);
+  burst(b.x, b.y - 10, "#6fcf4f", 10); sfx.pop();
+}
+function smashRock(r) {
+  if (r.broken) return;
+  r.broken = true; sfx.smash(); burst(r.x, r.y, "#9a9a9a", 18, 220);
+  if (r.leaf) addLeaf(r.x, r.y + 10, r.gold, true);
+}
+function roar() {
+  if (state !== "play" || pip.level < 4 || pip.roarCD > 0) return;
+  pip.roarCD = 3; pip.chomp = 0.6; sfx.roar();
+  rings.push({ x: pip.x, y: pip.y, r: 10, life: 1 });
+  const R = 380;
+  bushes.forEach(b => { if (dist(b.x, b.y, pip.x, pip.y) < R) { b.shake = 0.8; popBush(b); } });
+  rocks.forEach(r => { if (dist(r.x, r.y, pip.x, pip.y) < R) smashRock(r); });
+}
+function eat(l) {
+  const pts = l.gold ? 3 : 1;
+  pip.eaten += pts; pip.chomp = 0.25;
+  l.gone = true;
+  l.gold ? sfx.gold() : sfx.chomp();
+  burst(l.x, l.y, l.gold ? "#ffd84d" : "#7ed957", 10);
+  floatText(l.x, l.y - 20, "+" + pts, l.gold ? "#ffe066" : "#fff");
+  while (pip.level < LEVELS.length - 1 && pip.eaten >= LEVELS[pip.level + 1].at) levelUp();
+  updateHud();
+}
+function levelUp() {
+  pip.level++;
+  const L = LEVELS[pip.level];
+  sfx.level(); burst(pip.x, pip.y, COLORS[pip.level][0], 30, 260); burst(pip.x, pip.y, "#fff7a8", 20, 200);
+  banner(L.title, L.text);
+  if (pip.level >= 4) $("roarBtn").style.display = "block";
+  if (pip.level === LEVELS.length - 1) setTimeout(showEnding, 2600);
+}
+function updateHud() {
+  $("count").textContent = pip.eaten;
+  $("lvlName").textContent = LEVELS[pip.level].name;
+  const cur = LEVELS[pip.level].at, nxt = LEVELS[pip.level + 1];
+  $("barFill").style.width = nxt ? Math.min(100, (pip.eaten - cur) / (nxt.at - cur) * 100) + "%" : "100%";
+}
+
+// ---------- Update ----------
+let respawn = 0;
+function update(dt) {
+  pip.t += dt;
+  let dx = 0, dy = 0;
+  if (keys["arrowleft"] || keys["a"]) dx -= 1;
+  if (keys["arrowright"] || keys["d"]) dx += 1;
+  if (keys["arrowup"] || keys["w"]) dy -= 1;
+  if (keys["arrowdown"] || keys["s"]) dy += 1;
+  if (pointer) {
+    const wx = camX + pointer.x / zoom, wy = camY + pointer.y / zoom;
+    const d = dist(wx, wy, pip.x, pip.y);
+    if (d > 12) { dx = (wx - pip.x) / d; dy = (wy - pip.y) / d; }
+  }
+  const len = Math.hypot(dx, dy);
+  pip.moving = len > 0;
+  if (len) {
+    const sp = speedOf() * dt / len;
+    pip.x += dx * sp; pip.y += dy * sp;
+    if (Math.abs(dx) > 0.2) pip.face = dx > 0 ? 1 : -1;
+  }
+  const pr = radiusOf();
+  pip.x = Math.max(30 + pr, Math.min(W - 30 - pr, pip.x));
+  pip.y = Math.max(30 + pr, Math.min(H - 30 - pr, pip.y));
+
+  // collisions
+  const push = (o, r) => {
+    const d = dist(pip.x, pip.y, o.x, o.y);
+    if (d < r && d > 0) { pip.x = o.x + (pip.x - o.x) / d * r; pip.y = o.y + (pip.y - o.y) / d * r; return true; }
+    return false;
+  };
+  trees.forEach(t => push(t, t.r + pr * 0.8));
+  push({ x: TREE.x, y: TREE.y }, 50 + pr * 0.8);
+  rocks.forEach(r => {
+    if (r.broken) return;
+    if (dist(pip.x, pip.y, r.x, r.y) < r.r + pr) {
+      if (pip.level >= 3) smashRock(r);
+      else { push(r, r.r + pr); if (Math.random() < 0.03) { sfx.bonk(); floatText(r.x, r.y - 40, "Too heavy!", "#fff"); } }
+    }
+  });
+  bushes.forEach(b => {
+    if (dist(pip.x, pip.y, b.x, b.y) < b.r + pr) { if (b.shake < 0.2) b.shake = 0.3; popBush(b); }
+    b.shake = Math.max(0, b.shake - dt);
+  });
+
+  leaves.forEach(l => {
+    l.pop = Math.max(0, l.pop - dt * 2.2);
+    if (l.pop < 0.3 && dist(pip.x, pip.y, l.x, l.y) < pr + 16) eat(l);
+  });
+  leaves = leaves.filter(l => !l.gone);
+
+  // keep the meadow stocked so kids never get stuck
+  respawn -= dt;
+  if (respawn <= 0) {
+    respawn = 6;
+    if (leaves.length < 10) { const p = freeSpot(14); addLeaf(p.x, p.y, Math.random() < 0.12, true); }
+  }
+
+  pip.chomp = Math.max(0, pip.chomp - dt);
+  pip.roarCD = Math.max(0, pip.roarCD - dt);
+  $("roarBtn").classList.toggle("cool", pip.roarCD > 0);
+
+  parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt * 1.4; });
+  parts = parts.filter(p => p.life > 0);
+  texts.forEach(t => { t.y -= 40 * dt; t.life -= dt; });
+  texts = texts.filter(t => t.life > 0);
+  rings.forEach(r => { r.r += 700 * dt; r.life -= dt * 1.8; });
+  rings = rings.filter(r => r.life > 0);
+  butterflies.forEach(b => {
+    b.a += rnd(-2, 2) * dt; b.x += Math.cos(b.a) * 40 * dt; b.y += Math.sin(b.a) * 40 * dt;
+    if (b.x < 0 || b.x > W || b.y < 0 || b.y > H) b.a += Math.PI;
+  });
+  if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) $("banner").style.display = "none";
+}
+
+// ---------- Drawing ----------
+let camX = 0, camY = 0;
+function drawLeaf(x, y, gold, t, size = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 2) * 0.25); ctx.scale(size, size);
+  if (gold) { ctx.shadowColor = "#ffe066"; ctx.shadowBlur = 18; }
+  ctx.fillStyle = gold ? "#ffd23f" : "#3fbf3f";
+  ctx.beginPath(); ctx.moveTo(0, -14); ctx.quadraticCurveTo(13, -4, 0, 14); ctx.quadraticCurveTo(-13, -4, 0, -14); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = gold ? "#c98a00" : "#1f7a1f"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(0, 17); ctx.stroke();
+  ctx.restore();
+}
+function drawTree(t) {
+  const s = t.s;
+  ctx.fillStyle = "rgba(0,0,0,.15)"; ctx.beginPath(); ctx.ellipse(t.x, t.y + 6, 34 * s, 12 * s, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#8a5a2b"; ctx.fillRect(t.x - 9 * s, t.y - 50 * s, 18 * s, 56 * s);
+  [["#2f8a3a", 0, -80, 44], ["#3ba348", -26, -64, 32], ["#3ba348", 26, -64, 32], ["#52bd5c", 0, -92, 28]].forEach(([c, ox, oy, r]) => {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(t.x + ox * s, t.y + oy * s, r * s, 0, 7); ctx.fill();
+  });
+}
+function drawGreatTree(t) {
+  const glow = pip.level / (LEVELS.length - 1);
+  ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(TREE.x, TREE.y + 8, 90, 26, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#7a4a22"; ctx.beginPath();
+  ctx.moveTo(TREE.x - 45, TREE.y + 5); ctx.lineTo(TREE.x - 25, TREE.y - 140); ctx.lineTo(TREE.x + 25, TREE.y - 140); ctx.lineTo(TREE.x + 45, TREE.y + 5); ctx.fill();
+  ctx.shadowColor = "#fff2a0"; ctx.shadowBlur = 10 + glow * 50;
+  const base = glow > 0.99 ? ["#f5c542", "#ffd966", "#ffe58f"] : ["#2f7d3a", "#3f9a48", "#58b860"];
+  [[0, -210, 110, 0], [-85, -165, 75, 1], [85, -165, 75, 1], [0, -270, 70, 2], [-50, -240, 60, 2], [50, -240, 60, 2]].forEach(([ox, oy, r, ci]) => {
+    ctx.fillStyle = base[ci]; ctx.beginPath(); ctx.arc(TREE.x + ox, TREE.y + oy, r, 0, 7); ctx.fill();
+  });
+  ctx.shadowBlur = 0;
+  // sparkles grow as Pip grows
+  for (let i = 0; i < 4 + pip.level * 4; i++) {
+    const a = i * 2.4 + t * 0.6, rr = 60 + (i * 37) % 90;
+    ctx.fillStyle = `rgba(255,240,150,${0.5 + 0.5 * Math.sin(t * 3 + i)})`;
+    ctx.beginPath(); ctx.arc(TREE.x + Math.cos(a) * rr, TREE.y - 210 + Math.sin(a) * rr * 0.7, 3, 0, 7); ctx.fill();
+  }
+}
+function drawBush(b, t) {
+  const sx = b.shake > 0 ? Math.sin(t * 50) * 4 : 0;
+  ctx.fillStyle = "rgba(0,0,0,.13)"; ctx.beginPath(); ctx.ellipse(b.x, b.y + 12, 36, 10, 0, 0, 7); ctx.fill();
+  [["#2e9440", -16, -6, 20], ["#2e9440", 16, -6, 20], ["#3aad4d", 0, -16, 24], ["#46c05a", -6, -22, 12]].forEach(([c, ox, oy, r]) => {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(b.x + ox + sx, b.y + oy, r, 0, 7); ctx.fill();
+  });
+  if (b.leaf) { // twinkle hint
+    const s = Math.max(0, Math.sin(t * 3 + b.x));
+    ctx.fillStyle = b.gold ? `rgba(255,220,60,${s})` : `rgba(255,255,255,${s})`;
+    star(b.x + 12 + sx, b.y - 30, 4 + s * 4);
+  }
+}
+function star(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.35 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  ctx.fill();
+}
+function drawRock(r) {
+  if (r.broken) {
+    ctx.fillStyle = "#9b9b9b";
+    [[-14, 4, 7], [10, 6, 8], [0, -4, 5]].forEach(([ox, oy, s]) => { ctx.beginPath(); ctx.arc(r.x + ox, r.y + oy, s, 0, 7); ctx.fill(); });
+    return;
+  }
+  ctx.fillStyle = "rgba(0,0,0,.15)"; ctx.beginPath(); ctx.ellipse(r.x, r.y + 14, 34, 10, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#a3a3a8"; ctx.beginPath(); ctx.ellipse(r.x, r.y, 32, 24, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#c4c4c9"; ctx.beginPath(); ctx.ellipse(r.x - 8, r.y - 8, 14, 8, -0.3, 0, 7); ctx.fill();
+  if (r.leaf) { // glowing green crack
+    ctx.strokeStyle = r.gold ? "#ffcf33" : "#4be04b"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(r.x + 4, r.y - 18); ctx.lineTo(r.x - 2, r.y - 6); ctx.lineTo(r.x + 6, r.y + 2); ctx.lineTo(r.x, r.y + 14); ctx.stroke();
+  }
+}
+function drawPip(t) {
+  // Long-neck leaf-eater (sauropod), drawn facing right in local units, feet at y=0.
+  const s = scaleOf(), lvl = pip.level, [base, dark, light] = COLORS[lvl];
+  const walk = pip.moving ? Math.sin(t * 10) : 0;
+  const bob = pip.moving ? Math.abs(Math.cos(t * 10)) * 1.5 : 0;
+  const sway = Math.sin(t * 1.6) * 1.5 + (pip.moving ? walk * 0.8 : 0); // neck sway
+  const nod = pip.chomp > 0 ? Math.sin(pip.chomp * 25) * 2 : 0;
+  ctx.save(); ctx.translate(pip.x, pip.y);
+  // ground shadow
+  ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(-4 * s, 3 * s, 40 * s, 7 * s, 0, 0, 7); ctx.fill();
+  ctx.scale(pip.face * s, s); ctx.translate(0, -bob);
+
+  const leg = (hx, phase, col, w) => {           // pillar leg with toes
+    const sw = walk * 5 * phase, lift = Math.max(0, walk * phase) * 2.5;
+    ctx.fillStyle = col; ctx.beginPath();
+    ctx.moveTo(hx - w, -20); ctx.quadraticCurveTo(hx - w - 1 + sw * 0.4, -8, hx - w + sw, -lift);
+    ctx.lineTo(hx + w + 1 + sw, -lift); ctx.quadraticCurveTo(hx + w + 1 + sw * 0.4, -8, hx + w, -20); ctx.fill();
+    ctx.fillStyle = "rgba(240,230,200,.85)";      // toenails
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(hx - w + 2.5 + i * w * 0.75 + sw, -lift - 0.5, 1.4, 1.1, 0, 0, 7); ctx.fill(); }
+  };
+  // far legs (darker, behind body)
+  leg(-12, -1, dark, 4.5); leg(13, 1, dark, 4.5);
+
+  // body silhouette: tail -> back -> neck -> head -> jaw -> chest -> belly
+  const hx = sway, hy = nod;
+  const body = new Path2D();
+  body.moveTo(-60, -14);
+  body.bezierCurveTo(-44, -20, -30, -34, -12, -36);
+  body.bezierCurveTo(2, -38, 14, -34, 19, -28);
+  body.bezierCurveTo(24, -38, 26 + hx, -52 + hy, 33 + hx, -60 + hy);
+  body.bezierCurveTo(37 + hx, -66 + hy, 46 + hx, -65 + hy, 49 + hx, -60 + hy);
+  body.quadraticCurveTo(51 + hx, -57 + hy, 48 + hx, -55 + hy);
+  body.bezierCurveTo(45 + hx, -53 + hy, 41 + hx, -54 + hy, 38 + hx, -53 + hy);
+  body.bezierCurveTo(33 + hx, -46 + hy, 31, -34, 27, -22);
+  body.bezierCurveTo(22, -10, 6, -10, -10, -12);
+  body.bezierCurveTo(-26, -13, -42, -11, -60, -14);
+  body.closePath();
+
+  if (lvl >= 4) { ctx.shadowColor = lvl === 5 ? "#ffe066" : "#d6b8ff"; ctx.shadowBlur = 22 + Math.sin(t * 4) * 6; }
+  const g = ctx.createLinearGradient(0, -62, 0, -10);
+  g.addColorStop(0, light); g.addColorStop(0.45, base); g.addColorStop(1, dark);
+  ctx.fillStyle = g; ctx.fill(body); ctx.shadowBlur = 0;
+
+  ctx.save(); ctx.clip(body);
+  // soft belly shade
+  ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(4, -9, 30, 7, 0, 0, 7); ctx.fill();
+  // skin spots along the back
+  ctx.fillStyle = "rgba(0,0,0,.16)";
+  [[-30, -26, 4], [-20, -31, 5], [-8, -33, 4.5], [4, -33, 5], [13, -30, 3.5], [-40, -21, 3], [-50, -17, 2.2], [24 + hx * 0.5, -40, 2.8], [28 + hx * 0.8, -50 + hy, 2.4]]
+    .forEach(([x, y, r]) => { ctx.beginPath(); ctx.ellipse(x, y, r * 1.3, r, 0, 0, 7); ctx.fill(); });
+  // tiny scale texture
+  ctx.fillStyle = "rgba(255,255,255,.12)";
+  for (let i = 0; i < 26; i++) { const x = -48 + (i * 37) % 70, y = -30 + (i * 13) % 18; ctx.beginPath(); ctx.arc(x, y, 1, 0, 7); ctx.fill(); }
+  // neck wrinkles
+  ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = 0.8;
+  for (let i = 0; i < 4; i++) { const k = i / 4; ctx.beginPath(); ctx.arc(29 + hx * k + k * 3, -27 - k * 24 + hy * k, 5, 0.3, 1.6); ctx.stroke(); }
+  // top highlight
+  ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-40, -24); ctx.bezierCurveTo(-28, -33, -6, -37, 12, -32); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 1; ctx.stroke(body);
+
+  // back ridge bumps (stronger dinos get a bolder ridge)
+  if (lvl >= 3) {
+    ctx.fillStyle = lvl === 5 ? "#d99a1e" : dark;
+    for (let i = 0; i < 6; i++) { const x = -32 + i * 8, y = -33 - Math.sin((i + 1) / 7 * Math.PI) * 4; ctx.beginPath(); ctx.ellipse(x, y, 2.6, 2, 0, 0, 7); ctx.fill(); }
+  }
+  // near legs
+  leg(-16, 1, base, 5); leg(9, -1, base, 5);
+  ctx.fillStyle = "rgba(0,0,0,.12)"; ctx.fillRect(-21, -18, 10, 3); ctx.fillRect(4, -18, 10, 3);
+
+  // face
+  const ex = 42 + hx, ey = -60 + hy;
+  ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(ex, ey - 1.6, 3.2, 1.2, -0.2, 0, 7); ctx.fill(); // brow
+  ctx.fillStyle = "#f6edd0"; ctx.beginPath(); ctx.arc(ex, ey, 2.3, 0, 7); ctx.fill();
+  ctx.fillStyle = "#2a1a0a"; ctx.beginPath(); ctx.arc(ex + 0.6, ey + 0.2, 1.6, 0, 7); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ex + 1.1, ey - 0.5, 0.55, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.ellipse(48.5 + hx, -59.5 + hy, 0.9, 0.6, 0, 0, 7); ctx.fill(); // nostril
+  if (pip.chomp > 0) {
+    ctx.fillStyle = "#7a2a35"; ctx.beginPath();
+    ctx.moveTo(38 + hx, -54 + hy); ctx.lineTo(49 + hx, -56 + hy); ctx.lineTo(47 + hx, -52 + hy); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.translate(50 + hx, -54 + hy); ctx.rotate(0.6); ctx.scale(0.35, 0.35);
+    ctx.fillStyle = "#3fbf3f"; ctx.beginPath(); ctx.moveTo(0, -14); ctx.quadraticCurveTo(13, -4, 0, 14); ctx.quadraticCurveTo(-13, -4, 0, -14); ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(39 + hx, -54.5 + hy); ctx.quadraticCurveTo(44 + hx, -54 + hy, 48 + hx, -56 + hy); ctx.stroke();
+  }
+  // crown for the Leaf Guardian
+  if (lvl === 5) {
+    ctx.save(); ctx.translate(41 + hx, -65 + hy); ctx.rotate(-0.15);
+    ctx.fillStyle = "#ffd23f"; ctx.strokeStyle = "#a86f00"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(-6, -5); ctx.lineTo(-3, -1.5); ctx.lineTo(0, -7); ctx.lineTo(3, -1.5); ctx.lineTo(6, -5); ctx.lineTo(6, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function nearestTarget() {
+  let best = null, bd = Infinity;
+  const consider = (x, y) => { const d = dist(x, y, pip.x, pip.y); if (d < bd) { bd = d; best = { x, y }; } };
+  leaves.forEach(l => consider(l.x, l.y));
+  bushes.forEach(b => b.leaf && consider(b.x, b.y));
+  if (pip.level >= 3) rocks.forEach(r => !r.broken && r.leaf && consider(r.x, r.y));
+  return best;
+}
+function drawSniffer(t) {
+  const tg = nearestTarget(); if (!tg) return;
+  const a = Math.atan2(tg.y - pip.y, tg.x - pip.x), R = radiusOf() + 30 * scaleOf() + Math.sin(t * 6) * 4;
+  ctx.save(); ctx.translate(pip.x + Math.cos(a) * R, pip.y - 22 * scaleOf() + Math.sin(a) * R); ctx.rotate(a);
+  ctx.fillStyle = "#ffe14d"; ctx.strokeStyle = "#b8860b"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-3, 0); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function draw(t) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const viewW = vw / zoom, viewH = vh / zoom;
+  camX = viewW >= W ? (W - viewW) / 2 : Math.max(0, Math.min(W - viewW, pip.x - viewW / 2));
+  camY = viewH >= H ? (H - viewH) / 2 : Math.max(0, Math.min(H - viewH, pip.y - viewH / 2));
+  ctx.fillStyle = "#3f8a2e"; ctx.fillRect(0, 0, vw, vh);
+  ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, -camX * dpr * zoom, -camY * dpr * zoom);
+  ctx.drawImage(ground, 0, 0);
+  flowers.forEach(f => {
+    if (f.x < camX - 10 || f.x > camX + viewW + 10 || f.y < camY - 10 || f.y > camY + viewH + 10) return;
+    ctx.fillStyle = f.c; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(f.x + Math.cos(i * 1.256) * 4, f.y + Math.sin(i * 1.256) * 4, 3, 0, 7); ctx.fill(); }
+    ctx.fillStyle = "#f7b733"; ctx.beginPath(); ctx.arc(f.x, f.y, 2.2, 0, 7); ctx.fill();
+  });
+  // leaves on the ground (drawn under everything)
+  leaves.forEach(l => {
+    const hop = Math.sin(l.pop * Math.PI) * 40;
+    drawLeaf(l.x, l.y - hop - Math.abs(Math.sin(t * 2 + l.ph)) * 4, l.gold, t + l.ph, 1.15);
+  });
+  // y-sorted scene
+  const items = [];
+  trees.forEach(o => items.push([o.y, () => drawTree(o)]));
+  bushes.forEach(o => items.push([o.y, () => drawBush(o, t)]));
+  rocks.forEach(o => items.push([o.y, () => drawRock(o)]));
+  items.push([TREE.y, () => drawGreatTree(t)]);
+  items.push([pip.y, () => drawPip(t)]);
+  items.sort((a, b) => a[0] - b[0]).forEach(i => i[1]());
+  if (pip.level >= 1 && state === "play") drawSniffer(t);
+  rings.forEach(r => { ctx.strokeStyle = `rgba(255,200,120,${r.life})`; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); });
+  parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, 7); ctx.fill(); });
+  ctx.globalAlpha = 1;
+  butterflies.forEach(b => {
+    const f = Math.abs(Math.sin(t * 12 + b.x)) * 6 + 2;
+    ctx.fillStyle = b.c; ctx.beginPath(); ctx.ellipse(b.x - 4, b.y, f, 5, 0, 0, 7); ctx.ellipse(b.x + 4, b.y, f, 5, 0, 0, 7); ctx.fill();
+  });
+  ctx.textAlign = "center"; ctx.font = "bold 26px 'Comic Sans MS', sans-serif";
+  texts.forEach(tx => { ctx.globalAlpha = Math.min(1, tx.life); ctx.lineWidth = 4; ctx.strokeStyle = "#2d5a1e"; ctx.strokeText(tx.s, tx.x, tx.y); ctx.fillStyle = tx.c; ctx.fillText(tx.s, tx.x, tx.y); });
+  ctx.globalAlpha = 1;
+}
+
+// ---------- Screens ----------
+let state = "story", page = 0;
+function showPage() {
+  const p = STORY[page];
+  $("sEmoji").textContent = p.e; $("sTitle").textContent = p.t; $("sText").innerHTML = p.x; $("sHint").textContent = p.hint || "";
+  $("sNext").textContent = page === STORY.length - 1 ? "Let's Go! 🦕" : "Next ➜";
+}
+$("sNext").onclick = () => {
+  tone(600, 0.08, "triangle", 0.1);
+  if (state === "end") { $("story").classList.add("hidden"); state = "play"; return; }
+  if (++page < STORY.length) return showPage();
+  $("story").classList.add("hidden"); $("hud").classList.remove("hidden"); state = "play";
+  floatText(pip.x, pip.y - 50, "Find the leaves!", "#fff");
+};
+function showEnding() {
+  state = "end";
+  $("sEmoji").textContent = "🌳👑🦕"; $("sTitle").textContent = "The Valley Blooms!";
+  $("sText").innerHTML = "Pip let out the biggest, happiest ROAR ever! The magic flowed back into the Great Leaf Tree, and it shone bright gold.<br>The flowers bloomed and the Night Wind became a gentle breeze. 🌸<br><b>You did it!</b>";
+  $("sHint").textContent = "Keep playing and eat ALL the leaves!";
+  $("sNext").textContent = "Keep Playing";
+  $("story").classList.remove("hidden");
+  for (let i = 0; i < 80; i++) flowers.push({ x: rnd(20, W - 20), y: rnd(20, H - 20), c: ["#ff8fb1", "#ffd84d", "#fff", "#b48cff"][i % 4] });
+}
+
+// ---------- Pause / Restart / Exit ----------
+function pause() {
+  if (state !== "play") return;
+  state = "pause"; pointer = null; for (const k in keys) keys[k] = false;
+  $("menu").classList.remove("hidden");
+}
+function resume() { $("menu").classList.add("hidden"); state = "play"; last = performance.now(); }
+function resetGame() {
+  buildWorld();
+  Object.assign(pip, { x: W / 2, y: H / 2 + 230, face: 1, eaten: 0, level: 0, chomp: 0, roarCD: 0, moving: false });
+  parts = []; texts = []; rings = []; respawn = 0; bannerTimer = 0;
+  $("banner").style.display = "none"; $("roarBtn").style.display = "none";
+  updateHud();
+}
+$("pauseBtn").onclick = pause;
+$("mResume").onclick = resume;
+$("mRestart").onclick = () => {
+  resetGame(); resume(); sfx.level();
+  floatText(pip.x, pip.y - 60, "New adventure!", "#fff");
+};
+$("mExit").onclick = () => {
+  resetGame(); $("menu").classList.add("hidden"); $("hud").classList.add("hidden");
+  state = "story"; page = 0; showPage(); $("story").classList.remove("hidden");
+};
+
+// ---------- Loop ----------
+buildWorld(); paintGround(); showPage(); updateHud();
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (state === "play") update(dt);
+  draw(now / 1000);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
